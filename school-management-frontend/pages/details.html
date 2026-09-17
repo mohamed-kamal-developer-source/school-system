@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Details - School Management System</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="details-page">
+        <div class="details-container">
+            <div class="details-header">
+                <button class="btn btn-secondary" onclick="goBack()">← Back</button>
+                <div class="details-actions" id="detailsActions"></div>
+            </div>
+            <div id="detailsContent"></div>
+        </div>
+    </div>
+    <div id="toast-container"></div>
+    <div id="loading" class="loading-overlay" style="display: none;"><div class="spinner"></div></div>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/details.js"></script>
+</body>
+</html>
