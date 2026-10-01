@@ -26,7 +26,11 @@ router
     userControlller.ristrictTo("admin"),
     subjectControlller.getAllSubjects,
   )
-  .post(subjectControlller.createSubject);
+  .post(
+    userControlller.protect,
+    userControlller.ristrictTo("admin"),
+    subjectControlller.createSubject,
+  );
 
 router
   .route("/:id")

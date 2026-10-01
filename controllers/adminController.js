@@ -111,7 +111,7 @@ exports.bulkCreateStudents = asyncErrorHandeler(async (req, res, next) => {
 });
 
 exports.getDashboard = asyncErrorHandeler(async (_req, res) => {
-  const [students, teachers, paymentSummary] = await Promise.all([
+  const [students, teachers, paymentSummary, totals] = await Promise.all([
     client.query(`
       SELECT s.id, s.name, s.email,
              ROUND(AVG((g.score / NULLIF(g.max_score, 0)) * 100), 2) AS average_score,
@@ -138,11 +138,18 @@ exports.getDashboard = asyncErrorHandeler(async (_req, res) => {
         COALESCE(SUM(amount) FILTER (WHERE status IN ('pending', 'overdue') AND active = TRUE), 0) AS outstanding_amount,
         COUNT(*) FILTER (WHERE status IN ('pending', 'overdue') AND active = TRUE)::INTEGER AS outstanding_payments
       FROM payments`),
+    client.query(`
+      SELECT
+        (SELECT COUNT(*)::INTEGER FROM student WHERE active = TRUE) AS students,
+        (SELECT COUNT(*)::INTEGER FROM teacher WHERE active = TRUE) AS teachers,
+        (SELECT COUNT(*)::INTEGER FROM subject WHERE active = TRUE) AS subjects,
+        (SELECT COUNT(*)::INTEGER FROM class WHERE active = TRUE) AS classes`),
   ]);
 
   respond(res, 200, {
     top_students: students.rows,
     top_teachers: teachers.rows,
     payments: paymentSummary.rows[0],
+    data: totals.rows[0],
   });
 });

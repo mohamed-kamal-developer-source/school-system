@@ -3,6 +3,7 @@ const router = express.Router();
 const userController = require("../controllers/userContoller");
 
 router.route("/sign").post(userController.signIn);
+router.route("/me").get(userController.protect, userController.getMe);
 
 router.route("/forgetPassword").post(userController.forgetPassword);
 
@@ -12,9 +13,7 @@ router
   .route("/updatePassword")
   .post(userController.protect, userController.updatePassword);
 
-router
-  .route("/updateMe")
-  .post(userController.protect, userController.updateMe);
+router.route("/updateMe").post(userController.protect, userController.updateMe);
 
 router.route("/").post(userController.createUser);
 

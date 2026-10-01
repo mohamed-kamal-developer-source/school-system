@@ -1,9 +1,14 @@
-const { Client } = require("pg");
+const { Pool } = require("pg");
 const dotenv = require("dotenv");
+
 dotenv.config({ path: "./config.env" });
 
-const client = new Client({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-module.exports = client;
+pool.on("error", (err) => {
+  console.error("Unexpected PostgreSQL pool error:", err);
+});
+
+module.exports = pool;

@@ -1,12 +1,16 @@
 const app = require("./app");
-const client = require("./pg");
+const pool = require("./pg");
 
 app.listen(3232, () => {
   console.log("server has started...");
 });
 
-client.connect().then(() => {
-  console.log("DB connection successful");
-});
-
-
+pool
+  .connect()
+  .then((client) => {
+    console.log("DB connection successful");
+    client.release();
+  })
+  .catch((err) => {
+    console.error("DB connection failed:", err);
+  });

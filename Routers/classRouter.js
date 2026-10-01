@@ -8,8 +8,16 @@ router
   .route("/getAttendance")
   .post(
     userController.protect,
-    userController.ristrictTo("admin","teacher"),
+    userController.ristrictTo("admin", "teacher"),
     classControlller.getAttendanceOfClass,
+  );
+
+router
+  .route("/getGrades")
+  .post(
+    userController.protect,
+    userController.ristrictTo("admin", "teacher"),
+    classControlller.getGradesOfClass,
   );
 
 router
@@ -24,7 +32,7 @@ router
   .route("/getStudents/:id")
   .get(
     userController.protect,
-    userController.ristrictTo("admin","teacher"),
+    userController.ristrictTo("admin", "teacher"),
     classControlller.getClassStudents,
   );
 

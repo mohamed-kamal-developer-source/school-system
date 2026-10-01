@@ -602,8 +602,8 @@ exports.getTeacherClassses = asyncErrorHandeler(async (req, res, next) => {
   }
 
   if (req.user.role === "admin") {
-    validationData(req.body.teacherId);
-    teacherId = req.body.teacherId;
+    validationData(req.query.teacherId);
+    teacherId = req.query.teacherId;
   }
 
   query = `

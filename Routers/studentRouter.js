@@ -7,19 +7,26 @@ const uploadExcel = require("../Utils/uploadExcel");
 const adminController = require("../controllers/adminController");
 
 router
+  .route("/dashboard")
+  .get(
+    userControlller.protect,
+    userControlller.ristrictTo("student"),
+    studentControlller.getStudentDashboard,
+  );
+
+router
   .route("/getClass/:id") //get class of student
   .get(
     userControlller.protect,
-    userControlller.ristrictTo("admin","student"),
+    userControlller.ristrictTo("admin", "student"),
     studentControlller.getStudentClass,
   );
-
 
 router
   .route("/getSubjects/:id") //get subjects of student
   .get(
     userControlller.protect,
-    userControlller.ristrictTo("admin","student"),
+    userControlller.ristrictTo("admin", "student"),
     studentControlller.getStudentSubjects,
   );
 
@@ -27,28 +34,26 @@ router
   .route("/getClass") //get class of student
   .get(
     userControlller.protect,
-    userControlller.ristrictTo("admin","student"),
+    userControlller.ristrictTo("admin", "student"),
     studentControlller.getStudentClass,
   );
-
 
 router
   .route("/getSubjects") //get subjects of student
   .get(
     userControlller.protect,
-    userControlller.ristrictTo("admin","student"),
+    userControlller.ristrictTo("admin", "student"),
     studentControlller.getStudentSubjects,
   );
 
-  router
-    .route("/getGrades/:id")
-    .post(
-      userControlller.protect,
-      userControlller.ristrictTo("student", "admin"),
-      studentControlller.getStudentGrades,
-    );
+router
+  .route("/getGrades/:id")
+  .post(
+    userControlller.protect,
+    userControlller.ristrictTo("student", "admin"),
+    studentControlller.getStudentGrades,
+  );
 
-    
 router
   .route("/enrollStudent")
   .post(
@@ -66,7 +71,6 @@ router
     adminController.bulkCreateStudents,
   );
 
-
 router
   .route("/getAttendance")
   .get(
@@ -81,8 +85,6 @@ router
     userControlller.ristrictTo("admin"),
     studentControlller.getStudentAttendace,
   );
-
-
 
 router
   .route("/transferStudent")

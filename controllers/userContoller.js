@@ -9,8 +9,8 @@ const bcrypt = require("bcryptjs");
 
 const sendEmail = require("../Utils/email");
 
-const signToken = (id) => {
-  const token = jwt.sign({ id: id }, process.env.SECRET_KEY, {
+const signToken = (id, role) => {
+  const token = jwt.sign({ id: id, role: role }, process.env.SECRET_KEY, {
     expiresIn: process.env.TOKEN_EXPIRE,
   });
   return token;
@@ -21,7 +21,33 @@ const passwordResetToken = () => {
   return token;
 };
 
-userResponse = (res, statusCode, data) => {
+const authCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  // Configurable cookie lifetime in days.
+  maxAge: Number(process.env.TOKEN_COOKIE_EXPIRE || 7) * 24 * 60 * 60 * 1000,
+};
+
+const getCookieValue = (req, name) => {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return undefined;
+
+  const cookie = cookieHeader
+    .split(";")
+    .map((value) => value.trim())
+    .find((value) => value.startsWith(`${name}=`));
+
+  if (!cookie) return undefined;
+
+  try {
+    return decodeURIComponent(cookie.slice(name.length + 1));
+  } catch {
+    return undefined;
+  }
+};
+
+const userResponse = (res, statusCode, data) => {
   res.status(statusCode).json({ status: "success", data });
 };
 
@@ -34,6 +60,18 @@ exports.getAllusers = asyncErrorHandeler(async (req, res, next) => {
   }
 
   userResponse(res, 200, { users: users.rows });
+});
+
+exports.getMe = asyncErrorHandeler(async (req, res, next) => {
+  const id = req.user.id;
+  const query = "SELECT * FROM users WHERE id = $1 AND active = true";
+  const user = await client.query(query, [id]);
+
+  if (!user.rowCount) {
+    return next(new customError("users not found", 404));
+  }
+
+  userResponse(res, 200, { user: user.rows[0] });
 });
 
 exports.createUser = asyncErrorHandeler(async (req, res, next) => {
@@ -78,7 +116,6 @@ exports.getOneUser = asyncErrorHandeler(async (req, res, next) => {
 
   userResponse(res, 200, { user: user.rows[0] });
 });
-
 
 exports.ristrictTo = (...roles) => {
   return (req, res, next) => {
@@ -143,6 +180,11 @@ exports.protect = asyncErrorHandeler(async (req, res, next) => {
     token = testToken.split(" ")[1];
   }
 
+  // Browser clients can authenticate with the HTTP-only cookie set at login.
+  if (!token) {
+    token = getCookieValue(req, "token");
+  }
+
   if (!token) {
     return next(new customError("there is no token. please try again", 401));
   }
@@ -172,8 +214,7 @@ exports.signIn = asyncErrorHandeler(async (req, res, next) => {
   if (!email || !password) {
     return next(new customError("email && password is required", 404));
   }
-  const query =
-    "SELECT * FROM users WHERE email = $1 AND active = true";
+  const query = "SELECT * FROM users WHERE email = $1 AND active = true";
   const values = [email];
   const user = await client.query(query, values);
 
@@ -188,7 +229,10 @@ exports.signIn = asyncErrorHandeler(async (req, res, next) => {
     return next(new customError("invalid password. please try again", 404));
   }
 
-  user.rows[0].token = signToken(user.rows[0].id);
+  const token = signToken(user.rows[0].id, user.rows[0].role);
+  res.cookie("token", token, authCookieOptions);
+
+  user.rows[0].token = token;
   delete user.rows[0].password_hash;
   userResponse(res, 200, { user: user.rows[0] });
 });

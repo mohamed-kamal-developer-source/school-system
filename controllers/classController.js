@@ -44,16 +44,16 @@ exports.getAllClasses = asyncErrorHandeler(async (req, res, next) => {
 });
 
 exports.createClass = asyncErrorHandeler(async (req, res, next) => {
-  const { gradeLevel, groupName, academicYear, roomNumber} = req.body;
+  const { gradeLevel, groupName, academicYear, roomNumber, status } = req.body;
   validationData(gradeLevel, groupName, academicYear, roomNumber);
 
   const query = `
     INSERT INTO class 
-    (grade_level, group_name, academic_year, room_number)
-    VALUES ($1,$2,$3,$4)
+    (grade_level, group_name, academic_year, room_number,status)
+    VALUES ($1,$2,$3,$4,$5)
     RETURNING *`;
 
-  const values = [gradeLevel, groupName, academicYear, roomNumber];
+  const values = [gradeLevel, groupName, academicYear, roomNumber, status];
 
   const Class = await client.query(query, values);
 
@@ -146,7 +146,8 @@ exports.getClassSubjects = asyncErrorHandeler(async (req, res, next) => {
   SELECT 
   s.id AS subject_id,
   s.name AS subject_name,
-  s.description AS subject_description
+  s.description AS subject_description,
+  s.is_core AS is_core
   FROM classSubjects cs
   JOIN class c on cs.class_id = c.id
   JOIN subject s on cs.subject_id = s.id
@@ -335,4 +336,85 @@ exports.getAttendanceOfClass = asyncErrorHandeler(async (req, res, next) => {
   }
 
   classResponse(res, 200, { attendance: attendance.rows });
+});
+
+exports.getGradesOfClass = asyncErrorHandeler(async (req, res, next) => {
+  const { classId, subjectId } = req.body;
+  validationData(classId);
+
+  let query = `
+  SELECT
+  g.id AS id,
+  s.name AS student_name,
+  g.exam_type AS exam_type,
+  g.score AS score,
+  g.max_score AS max_score,
+  ROUND((g.score::numeric / NULLIF(g.max_score, 0)) * 100, 2) AS percentage,
+  sb.name AS subject_name,
+  t.name AS teacher_name
+  
+  FROM enrollment e
+  JOIN class c ON e.class_id = c.id
+  JOIN student s ON e.student_id = s.id
+  JOIN grades g ON g.student_id = s.id
+  JOIN classSubjects cs ON g.class_subject_id = cs.id
+  JOIN subject sb ON cs.subject_id = sb.id
+  JOIN teacher t ON cs.teacher_id = t.id
+  WHERE e.class_id = $1
+  AND cs.class_id = e.class_id
+  AND c.active = true
+  AND e.active = true
+  AND s.active = true
+  AND g.active = true
+  AND sb.active = true
+  AND t.active = true`;
+
+  const values = [classId];
+
+  if (req.user.role === "teacher") {
+    const teacher = await client.query(
+      `SELECT id FROM teacher WHERE user_id = $1 AND active = true`,
+      [req.user.id],
+    );
+
+    if (!teacher.rowCount) {
+      return next(new customError("teacher not found", 404));
+    }
+
+    query += ` AND cs.teacher_id = $${values.length + 1}`;
+    values.push(teacher.rows[0].id);
+  } else if (subjectId !== undefined) {
+    validationData(subjectId);
+    query += ` AND cs.subject_id = $${values.length + 1}`;
+    values.push(subjectId);
+  }
+
+  const features = new apiFeatures(
+    req.query,
+    ["s.name", "g.score", "g.exam_type"],
+    ["s.name", "g.score", "g.exam_type"],
+    ["s.name", "sb.name", "g.exam_type"],
+    [...values],
+  );
+
+  const {
+    whereClause,
+    orderClause,
+    paginationClause,
+    values: queryValues,
+  } = features.filter().search().sort().paginate().build();
+
+  const grades = await client.query(
+    `${query}
+    ${whereClause}
+    ${orderClause}
+    ${paginationClause}`,
+    queryValues,
+  );
+
+  if (!grades.rowCount) {
+    return next(new customError("grades not found", 404));
+  }
+
+  classResponse(res, 200, { grades: grades.rows });
 });

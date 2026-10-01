@@ -21,7 +21,10 @@ const app = express();
 // 1️⃣ CORS Setup
 // ------------------------
 const corsOptions = {
-  origin: ['http://localhost:3232'], // الدومين الموحد للفرونت
+  origin: [
+    'http://localhost:3232',   // الستاتيك فرونت (لو بتفتحه من نفس البورت مش لازم أصلاً)
+    'http://localhost:3000',   // Next.js في وضع التطوير (البورت الافتراضي بتاعه)
+  ],
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -32,9 +35,11 @@ app.use(cors(corsOptions));
 // Preflight requests
 app.use((req, res, next) => {
   if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    if (corsOptions.origin.includes(req.headers.origin)) {
+      res.header('Access-Control-Allow-Origin', req.headers.origin);
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    }
     return res.sendStatus(200);
   }
   next();

@@ -158,7 +158,6 @@ exports.updateStudent = asyncErrorHandeler(async (req, res, next) => {
       }
     }
 
-
     const fields = Object.keys(obj1);
     const values = Object.values(obj1);
     values.push(student.rows[0].user_id);
@@ -308,11 +307,11 @@ exports.getStudentAttendace = asyncErrorHandeler(async (req, res, next) => {
 });
 
 exports.transferStudent = asyncErrorHandeler(async (req, res, next) => {
-  const { studentId, newClassId } = req.body;
-  validationData(studentId, newClassId);
+  const { studentId, classId } = req.body;
+  validationData(studentId, classId);
 
   let query = `SELECT * FROM enrollment WHERE student_id = $1 AND class_id = $2`;
-  let values = [studentId, newClassId];
+  let values = [studentId, classId];
   const check = await client.query(query, values);
 
   if (check.rowCount) {
@@ -347,7 +346,7 @@ exports.transferStudent = asyncErrorHandeler(async (req, res, next) => {
   const endDate = new Date(startDate);
   endDate.setMonth(endDate.getMonth() + 6);
 
-  values = [studentId, newClassId, endDate, "active"];
+  values = [studentId, classId, endDate, "active"];
   const enrollment = await client.query(query, values);
 
   if (!enrollment.rowCount) {
@@ -390,7 +389,7 @@ exports.getStudentClass = asyncErrorHandeler(async (req, res, next) => {
     return next(new customError("class not found", 404));
   }
 
-  studentResponse(res, 200, { class: Class.rows[0] });
+  studentResponse(res, 200, { class: [Class.rows[0]] });
 });
 
 exports.getStudentSubjects = asyncErrorHandeler(async (req, res, next) => {
@@ -430,5 +429,76 @@ exports.getStudentSubjects = asyncErrorHandeler(async (req, res, next) => {
     return next(new customError("subjects not found", 404));
   }
 
-  studentResponse(res, 200, { subjects: subjects.rows[0] });
+  studentResponse(res, 200, { subjects: subjects.rows });
+});
+
+exports.getStudentDashboard = asyncErrorHandeler(async (req, res, next) => {
+  const student = await client.query(
+    `SELECT id FROM student WHERE user_id = $1 AND active = true`,
+    [req.user.id],
+  );
+
+  if (!student.rowCount) {
+    return next(new customError("student not found", 404));
+  }
+
+  const query = `
+  SELECT
+    (
+      SELECT COUNT(DISTINCT cs.subject_id)
+      FROM enrollment e
+      JOIN class c ON c.id = e.class_id AND c.active = true
+      JOIN classSubjects cs ON cs.class_id = c.id
+      JOIN subject s ON s.id = cs.subject_id AND s.active = true
+      WHERE e.student_id = $1 AND e.active = true
+    ) AS subjects,
+
+    COALESCE(
+      (
+        SELECT ROUND(AVG(g.score)::numeric, 2)
+        FROM grades g
+        WHERE g.student_id = $1 AND g.active = true
+      ),
+      0
+    ) AS grades,
+
+    COALESCE(
+      (
+        SELECT ROUND(
+          100.0 * COUNT(*) FILTER (WHERE LOWER(a.status) = 'present')
+          / NULLIF(COUNT(*), 0),
+          2
+        )
+        FROM attendance a
+        WHERE a.student_id = $1 AND a.active = true
+      ),
+      0
+    ) AS attendance,
+
+    (
+      SELECT json_build_object(
+        'level', c.grade_level,
+        'name', c.group_name,
+        'number',c.room_number
+      )
+      FROM enrollment e
+      JOIN class c ON c.id = e.class_id
+      WHERE e.student_id = $1
+        AND e.active = true
+        AND c.active = true
+      LIMIT 1
+    ) AS my_class
+`;
+
+  const dashboard = await client.query(query, [student.rows[0].id]);
+  const values = dashboard.rows[0];
+
+  studentResponse(res, 200, {
+    data: {
+      subjects: Number(values.subjects),
+      grades: Number(values.grades),
+      attendance: Number(values.attendance),
+      class: `${values.my_class.level} ${values.my_class.name} ${values.my_class.number} `,
+    },
+  });
 });
